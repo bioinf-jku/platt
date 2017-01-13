@@ -1,0 +1,12 @@
+Package: platt
+Type: Package
+Title: The package does Platt scaling.
+Version: 0.99.4
+Date: 2015-03-05
+Author: Guenter Klambauer, Andreas Mayr
+Maintainer: Guenter Klambauer <klambauer@bioinf.jku.at>
+LazyLoad: yes
+Description: Platt scales
+License: GPL-3
+NeedsCompilation: yes
+Packaged: 2016-12-27 15:47:22 UTC; gk

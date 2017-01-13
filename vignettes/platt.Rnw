@@ -1,0 +1,261 @@
+% -*- mode: noweb; noweb-default-code-mode: R-mode; -*-
+%\VignetteIndexEntry{Platt-Scaling: Manual for the R package}
+%\VignetteDepends{platt}
+%\VignettePackage{platt}
+%\VignetteKeywords{machine learning, predictions, sigmoid, Platt scaling}
+
+
+\documentclass[article]{bioinf}
+
+\usepackage[noae]{Sweave}
+\usepackage{amsmath,amssymb}
+\usepackage{bm}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage[authoryear]{natbib}
+
+\hypersetup{colorlinks=false,
+   pdfborder=0 0 0,
+   pdftitle={platt - Robust Platt scaling of prediction values},
+   pdfauthor={G\"unter Klambauer}}
+
+\title{platt - Robust Platt scaling of prediction values}
+\author{G\"unter Klambauer, Andreas Mayr, and Sepp Hochreiter}
+\affiliation{Institute of Bioinformatics, Johannes Kepler University
+Linz\\Altenberger Str. 69, 4040 Linz, Austria\\
+\email{klambauer@bioinf.jku.at}}
+
+
+\newcommand{\method}[1]{{\fontfamily{phv}\fontshape{rm}\selectfont #1}}
+\newcommand{\R}{R}
+\newcommand{\Real}{\mathbb{R}}
+
+\renewcommand{\vec}[1]{\mathbf{#1}}
+
+\setkeys{Gin}{width=0.55\textwidth}
+
+\SweaveOpts{eps=FALSE}
+
+\begin{document}
+<<echo=FALSE>>=
+options(width=75)
+set.seed(0)
+library(platt)
+plattVersion <- packageDescription("platt")$Version
+@
+\newcommand{\plattVersion}{\Sexpr{plattVersion}}
+\manualtitlepage[Version \plattVersion, \today]
+
+
+
+\vspace{1cm}
+
+\newlength{\auxparskip}
+\setlength{\auxparskip}{\parskip}
+\setlength{\parskip}{0pt}
+\tableofcontents
+\clearpage
+\setlength{\parskip}{\auxparskip}
+
+\newlength{\Nboxwidth}
+\setlength{\Nboxwidth}{\textwidth}
+\addtolength{\Nboxwidth}{-2\fboxrule}
+\addtolength{\Nboxwidth}{-2\fboxsep}
+
+\newcommand{\notebox}[1]{%
+\begin{center}
+\fbox{\begin{minipage}{\Nboxwidth}
+\noindent{\sffamily\bfseries Note:} #1
+\end{minipage}}
+\end{center}}
+
+\section{Introduction}
+%\method{Platt scaling} homepage at
+%\url{http://www.bioinf.jku.at/software/platt/}.
+
+Platt scaling \citep{Platt1999} maps the outputs of machine learning methods 
+to probabilistic outputs using a sigmoid function: 
+
+\[
+ P(y=1|\hat y_k) = \frac{1}{1+\exp(A\ \hat y_k+B)},
+\]
+where $\hat y_k$ is the prediction of a machine learning method for data point $x_k$.
+$A$ and $B$ are parameters of the sigmoid. This sigmoid model is
+equivalent to assuming that the output of the machine learning method is
+proportional to the log odds of a positive example.
+
+The parameters $A$ and $B$ are fit by maximum-likelihood-estimation using
+a training set with labelled data $(x_k,y_k)$,  in which the classes must 
+be coded as $0$ and $1$. The objective is:
+
+\[
+ \min _{A,B} - \sum _{k=1} ^N y_k \log \left(\frac{1}{1+\exp(A\ \hat y_k+B)} \right)
+  + (1-y_k) \log \left(1-\left(\frac{1}{1+\exp(A\ \hat y_k+B)} \right) \right)
+\]
+
+By optimizing this objective we obtain parameters $A$ and $B$ for the sigmoid,
+which we use for transforming the outputs of the machine learning methods
+into probabilistic outputs. A fast and robust optimization algorithm 
+is implemented in this package.
+
+
+\section{Getting started}
+
+To load the package, enter the following in your \R\ session:
+<<echo=TRUE>>=
+library(platt)
+@
+
+We have provided an example data set called "MMP" (mitochondrial membrane
+potential). This data sets includes the cross-validation predictions of
+neural networks (column "NN"), support vector machines (column "SVM") and
+random forests (column "RF").  We can see the three columns containing the
+cross-validation predictions and a fourth column containing the labels:
+
+<<echo=TRUE>>=
+library(platt)
+data(MMP)
+head(MMP)
+@
+
+We can estimate the sigmoid on the cross-validation predictions by 
+using the following:
+
+<<echo=TRUE>>=
+plattScalingResult <- plattScaling(MMP$SVM,MMP$target)
+@
+
+The object {\tt plattScalingResult} contains the mapped values and the two
+parameters of the sigmoid $A$ and $B$.
+
+<<echo=TRUE>>=
+str(plattScalingResult)
+@
+
+\section{Plotting the sigmoid function}
+We are now showing the original values against the Platt-scaled values 
+in the follwing plot:
+
+\begin{center}
+<<fig=TRUE,echo=TRUE>>=
+x1 <- MMP$SVM[MMP$target==0]
+y1 <- plattScalingResult$pred[MMP$target==0]
+plot(x1+rnorm(mean=0,sd=0.01,n=length(x1)),
+		y1+rnorm(mean=0,sd=0.01,n=length(x1)),
+		main="Platt-Scaling Plot",ylim=c(0,1),pch=".",cex=4, 
+		xlab="Original values", ylab="Platt-scaled values")
+x2 <- MMP$SVM[MMP$target==1]
+y2 <- plattScalingResult$pred[MMP$target==1]
+points(x2+rnorm(mean=0,sd=0.01,n=length(x2)),
+		y2+rnorm(mean=0,sd=0.01,n=length(x2)),
+		pch=".",col="red",cex=4)
+@
+\end{center}
+
+
+\section{Mapping new values to the sigmoid}
+If we are given a vector of new values, e.g. from a test data set, from the
+prediction method, we can readily map them to the sigmoid using the function 
+{\tt predictProb}:
+
+<<echo=TRUE>>=
+newValues <- c(-1.22,0.51,-0.43, 1.1,-1.01)
+newValuesPlattScaled <- predictProb(plattScalingResult,newValues)
+(cbind(newValues,newValuesPlattScaled))
+@
+
+
+
+
+\section{A new probabilistic way to make ensemble predictions}
+We now have multiple predictions of several machine learning methods that
+we aim to combine to a single probability that the molecule is active.
+The probability that a molecule is active given the probabilistic output
+$p_i$ of a model $i$ is $p(y=1|p_i)$ and we have $n$ models.
+
+If we have predictions $p_1,\ldots,p_n$ of $n$ models, we want to 
+calculate $p(z=1 \mid p_1,\ldots,p_n)$ using $p(y=1|p_i)$. This can be 
+achieved by using the following formula:
+
+\begin{align}
+&\frac{\prod_{i=1}^{n} p(z=1 \mid p_i) }{\prod_{i=1}^{n} p(z=1 \mid p_i)  
+\ + \ \prod_{i=1}^{n} p(z=0 \mid p_1)  \ \left( \frac{p(z=1)}{p(z=0)} \right)^{n-1} }  \ = \\\nonumber
+&\frac{\prod_{i=1}^{n} p(z=1 \mid p_i) \ p(p_i) }{\prod_{i=1}^{n} p(z=1 \mid p_i) \ p(p_i)  
+\ + \ \prod_{i=1}^{n} p(z=0 \mid p_i) \ p(p_i) \   \left( \frac{p(z=1)}{p(z=0)} \right)^{n-1}}  \ = \\\nonumber
+&\frac{\prod_{i=1}^{n} p(z=1 , p_i) }{\prod_{i=1}^{n} p(z=1 ,p_i) 
+\ + \ \prod_{i=1}^{n} p(z=0 ,p_i) \ \left( \frac{p(z=1)}{p(z=0)} \right)^{n-1} }  \ = \\\nonumber
+&\frac{\prod_{i=1}^{n} p(p_i \mid z=1)  \ p^n(z=1)}{\prod_{i=1}^{n} p(p_i \mid z=1) \ p^n(z=1)
+\ + \ \prod_{i=1}^{n} p(p_i \mid z=0 ) \ p(z=0) \ p^{n-1}(z=1) }   \ = \\\nonumber
+&\frac{p(p_1,\ldots,p_n \mid z=1) \ p(z=1)}{p(p_1,\ldots,p_n \mid z=1) \ p(z=1)
+\ + \ p(p_1,\ldots, p_n \mid z=0 ) \ p(z=0) }   \ = \\\nonumber
+&\frac{p(p_1,\ldots,p_n , z=1) }{p(p_1,\ldots,p_n , z=1) 
+\ + \ p(p_1,\ldots,p_n,z=0 ) }   \ = \\\nonumber
+&\frac{p(p_1,\ldots,p_n , z=1) }{p(p_1,\ldots,p_n )  }   \ = \\\nonumber
+&p(z=1 \mid p_1,\ldots,p_n) \ .
+\end{align}
+
+In the formula above the expressions $p(z=1)$ and $p(z=0)$ are the prior probabilities
+that a compound is active or inactive, respectively. These values can be 
+estimated from the relative frequencies of actives and inactives on the 
+training set.
+
+We have assumed above that:
+\begin{align}
+ \prod_{i=1}^{n} p(p_i \mid z=1) \ = \ p(p_1,\ldots,p_n \mid z=1) \\
+ \prod_{i=1}^{n} p(p_i \mid z=0) \ = \ p(p_1,\ldots,p_n \mid z=0) \ .
+\end{align}
+
+\paragraph{Another formula with equivalent order.}
+The following formula can also be used: 
+\begin{align}
+&\frac{\prod_{i=1}^{n} p(z=1 \mid p_i) }{\prod_{i=1}^{n} p(z=1 \mid p_i)  
+\ + \ \prod_{i=1}^{n} p(z=0 \mid p_1)    } 
+\end{align}
+
+This formula is equivalent with respect to the order, as can be seen in the
+following:
+\begin{align}
+& \ \ \ \ \ \ \ \frac{a_1}{a_1 \ + \ b_1 \ c} \ > \ \frac{a_2}{a_2 \ + \ b_2 \ c}\\\nonumber
+&\Leftrightarrow \ a_1 \ a_2 \ + \ a_1 \ b_2 \ c \ > \  a_1 \ a_2 \ +
+\  a_2 \ b_1 \ c \\\nonumber
+&\Leftrightarrow \  a_1 \ b_2 \ c \ > \  \  a_2 \ b_1 \ c \\\nonumber
+&\Leftrightarrow \  a_1 \ b_2 \ > \  \  a_2 \ b_1 \\\nonumber
+&\Leftrightarrow \ a_1 \ a_2 \ + \ a_1 \ b_2  \ > \  a_1 \ a_2 \ +
+\  a_2 \ b_1 \\\nonumber
+&\Leftrightarrow \ \frac{a_1}{a_1 \ + \ b_1} \ > \ \frac{a_2}{a_2 \ +
+  \ b_2} \ .
+\end{align}
+
+
+\paragraph{Implementation.}
+The function {\tt ensemble} implements the above method to combine probabilistic
+predictions of different machine learning methods to a single prediciton.\\
+
+<<echo=TRUE>>=
+p1 <- plattScaling(MMP$NN,MMP$target)$pred
+p2 <- plattScaling(MMP$RF,MMP$target)$pred
+p3 <- plattScaling(MMP$SVM,MMP$target)$pred
+df <- data.frame(p1,p2,p3)
+ensemblePrediction <- ensemble(df,
+		class1Prob=length(which(MMP$target==1))/nrow(MMP))
+
+(table(ensemblePrediction>0.5, MMP$target))
+@
+
+
+
+\bibliographystyle{natbib}
+%\bibliography{platt}
+\begin{thebibliography}{}
+
+\bibitem[Platt(1999)]{Platt1999}
+Platt, J.~C. (1999).
+\newblock Probabilistic outputs for support vector machines and comparisons to
+  regularized likelihood methods.
+\newblock In {\em Advances in large margin classifiers\/}.
+
+
+\end{thebibliography}
+
+
+\end{document}
